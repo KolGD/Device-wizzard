@@ -1,28 +1,30 @@
-from core.device_parser import (
-    parse_pci_devices,
-    parse_usb_devices,
-    enrich_devices
-)
-from core.device_scanner import scan_pci_devices, scan_usb_devices
+import sys
+
+from core.device_parser import enrich_devices, parse_pci_devices, parse_usb_devices
+from core.device_scanner import DeviceScanError, scan_pci_devices, scan_usb_devices
 
 
-# PCI devices
-pci_output = scan_pci_devices()
-pci_devices = parse_pci_devices(pci_output)
-pci_devices = enrich_devices(pci_devices, "PCI")
+def main():
+    exit_code = 0
 
-for device in pci_devices:
-    print(device)
+    for device_type, scan, parse in (
+        ("PCI", scan_pci_devices, parse_pci_devices),
+        ("USB", scan_usb_devices, parse_usb_devices),
+    ):
+        try:
+            raw_output = scan()
+        except DeviceScanError as error:
+            print(f"Scanning failed: {device_type}: {error}", file=sys.stderr)
+            exit_code = 1
+            continue
 
-print(f"Found {len(pci_devices)} PCI devices")
+        devices = enrich_devices(parse(raw_output), device_type)
+        for device in devices:
+            print(device)
+        print(f"Found {len(devices)} {device_type} devices")
+
+    return exit_code
 
 
-# USB devices
-usb_output = scan_usb_devices()
-usb_devices = parse_usb_devices(usb_output)
-usb_devices = enrich_devices(usb_devices, "USB")
-
-for device in usb_devices:
-    print(device)
-
-print(f"Found {len(usb_devices)} USB devices")
+if __name__ == "__main__":
+    sys.exit(main())
